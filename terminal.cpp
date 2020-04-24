@@ -4,6 +4,10 @@
 #include <QTimer>
 #include <QProcess>
 #include <QKeyEvent>
+#include <QTextBlock>
+
+#define CMDTXT "user@Terminal# "
+
 #define T_PrivPtr( o ) (( StationaryLampSet *) o )
 
 Terminal::Terminal(QWidget *parent) :
@@ -42,20 +46,24 @@ void Terminal::init()
 {
     cmd->start("bash");            //启动终端(Windows下改为cmd)
     cmd->waitForStarted();        //等待启动完成
-    ui->textEdit->append("user@Terminal# ");
+    ui->textEdit->append(CMDTXT);
 }
 
 void Terminal::write(){
-    int pos=0;
-    QString word= ui->textEdit->toPlainText();
-    QRegExp rxlen("user@Terminal#(.+)(\\n|$)");
-    rxlen.setMinimal (true) ;
-    pos=rxlen.lastIndexIn(word);
-   if(pos!=-1){
+    QString word=Terminal::textCursor();
+    QRegExp rxlen("user@Terminal#(.+)$");
+   if(rxlen.indexIn(word)!=-1 && Terminal::textEnd(15)!=CMDTXT)
+   {
        QString ch = rxlen.cap(1).trimmed()+"\n";
        char* shell; QByteArray ba = ch.toLatin1(); shell=ba.data();
        cmd->write(shell);
        //Terminal::checkshell();
+   }else{
+
+        QTextCursor cursor = ui->textEdit->textCursor();
+        cursor.movePosition(QTextCursor::End);
+        ui->textEdit->setTextCursor(cursor);
+
    }
 
 }
@@ -64,7 +72,7 @@ void Terminal::checkshell(){
     QString word= ui->textEdit->toPlainText().trimmed();
     QString w=word.mid(word.length()-1,word.length());
     if(w!="#"){
-        ui->textEdit->append("user@Terminal# ");
+        ui->textEdit->append(CMDTXT);
     }
 
 }
@@ -72,17 +80,60 @@ void Terminal::checkshell(){
 //监视对象
 bool Terminal::eventFilter(QObject *target, QEvent *event)
 {
-     /*处理按键消息 */
-    if (target == ui->textEdit && event->type() == QEvent::KeyPress){
+  /*处理按键消息 */
+  if(event->type() == QEvent::KeyPress)
+  {
+    if (target == ui->textEdit){
             /*强制类型转换 */
             QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
-            if (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == 16777220) {
+
+            //处理回车消息
+            if (keyEvent->key() == Qt::Key_Enter || keyEvent->key() == 16777220){
                    Terminal::write();
                     return true;
+            //处理删除消息
+            }else if(keyEvent->key() == Qt::Key_Backspace ){
+                QString  word=Terminal::textCursor();
+                //不允许删除前面的内容
+                if(Terminal::textEnd(15)==CMDTXT){return true;}
+
+                if(word.contains(CMDTXT)){
+
+                    return (Terminal::textCursor()==CMDTXT);
+                }else{
+
+                    return true;
+                }
+
+            //不允许修改前面的内容
+            }else if(Terminal::textEnd(15)==CMDTXT && Terminal::textCursor()!=CMDTXT){
+                return true;
+
             }
-    }
-    /*处理按键消息 */
-    return QWidget::eventFilter(target, event);
+     }
+
+   }
+
+     return QWidget::eventFilter(target, event);
+}
+
+//取光标所在行内容
+QString Terminal::textCursor()
+{
+    QTextCursor tc;
+    tc = ui->textEdit->textCursor();
+    return tc.block().text();
+}
+
+//从后截取文本
+
+QString Terminal::textEnd(int num)
+{
+   QString word=ui->textEdit->toPlainText();
+
+    word=word.mid(word.size()-num,word.size());
+
+    return word;
 }
 
 void Terminal::on_readoutput()

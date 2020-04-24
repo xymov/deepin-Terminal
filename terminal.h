@@ -16,7 +16,7 @@ class Terminal : public QMainWindow
 public:
     explicit Terminal(QWidget *parent = nullptr);
     ~Terminal();
-     cmd;
+     QProcess * cmd;
 
  protected :
 
@@ -33,6 +33,9 @@ private slots:
     void checkshell();
 private:
     Ui::Terminal *ui;
+    QString textCursor();
+    QString textEnd(int num);
+
 };
 
 #endif // TERMINAL_H
